@@ -6,45 +6,99 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct ContentView: View {
     @State private var currentQuestion: Question?
+    @State private var waitingForQuestion = false
 
     var body: some View {
         VStack {
             Text(currentQuestion?.text ?? "Tap the button to generate a question.")
-                            .padding()
-                            .font(.headline)
-
-                        Spacer()
-            ForEach(currentQuestion?.choices ?? [], id: \.self) { choice in
-                            Button(action: {
-                                checkAnswer(choice)
-                            }) {
-                                Text(choice)
-                                    .padding()
-                            }
-                            .disabled(currentQuestion == nil)
-                        }
+                .padding()
+                .font(.headline)
+            
             Spacer()
-
-                      Button("Generate Question") {
-                          currentQuestion = generateRandomQuestion()
-                      }
+            ForEach(currentQuestion?.choices ?? [], id: \.self) { choice in
+                Button(action: {
+                    checkAnswer(choice)
+                }) {
+                    Text(choice)
+                        .padding()
+                }
+                .disabled(currentQuestion == nil || waitingForQuestion)
+            }
+            Spacer()
+            
+            Button("Generate Question") {
+                if waitingForQuestion {
+                    // The user needs to wait, show the alert.
+                    waitingForQuestion = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        waitingForQuestion = false
+                    }
+                } else {
+                    // Generate a new question if not waiting.
+                    currentQuestion = generateRandomQuestionIfNeeded()
+                }
+            }
+            .disabled(waitingForQuestion)
         }
         .padding()
+        .alert(isPresented: $waitingForQuestion) {
+            Alert(
+                title: Text("Please wait!"),
+                message: Text("A new question will be available in a moment."),
+                dismissButton: .default(Text("Got it!")) {
+                    currentQuestion = generateRandomQuestionIfNeeded()
+                }
+
+            )
+        }
     }
     //make sure this is in the content view
-    func generateRandomQuestion() -> Question {
-        guard !questionBank.isEmpty else {
-            fatalError("Question bank is empty. Add questions to the questionBank array.")
+    
+    func generateRandomQuestionIfNeeded() -> Question {
+        if shouldDisplayNewQuestion() {
+            guard !questionBank.isEmpty else {
+                fatalError("Question bank is empty. Add questions to the questionBank array.")
+            }
+            
+            let randomIndex = Int.random(in: 0..<questionBank.count)
+            let newQuestion = questionBank[randomIndex]
+            
+            // Store the current date as the last date a question was displayed.
+            UserDefaults.standard.set(Date(), forKey: "LastQuestionDate")
+            
+            return newQuestion
+        } else {
+            return currentQuestion ?? Question(
+                text: "Please wait for a new question.",
+                choices: [],
+                correctAnswer: ""
+            )
         }
-        
-        let randomIndex = Int.random(in: 0..<questionBank.count)
-        return questionBank[randomIndex]
     }
+    
     //make sure this is in the content view
 
+    func shouldDisplayNewQuestion() -> Bool {
+        // Retrieve the last date a question was displayed (using UserDefaults).
+        if let lastQuestionDate = UserDefaults.standard.object(forKey: "LastQuestionDate") as? Date {
+            // Get the current date.
+            let currentDate = Date()
+print(currentDate)
+            // Compare the last question date with the current date and check if it's a different day.
+            let calendar = Calendar.current
+            return !calendar.isDate(lastQuestionDate, inSameDayAs: currentDate)
+        }
+
+        // If there's no last question date (first-time use), return true to display a new question.
+        return true
+    }
+    
+    
+    
     func checkAnswer(_ selectedAnswer: String) {
         guard let question = currentQuestion else {
             return
@@ -61,7 +115,9 @@ struct ContentView: View {
 
 }
 // this is outside of the contentview
+
 let questionBank = [
+    
     Question(text: "What is the capital of France?", choices: ["London", "Paris", "Berlin", "Madrid"], correctAnswer: "Paris"),
     Question(text: "Which planet is closest to the sun?", choices: ["Venus", "Mercury", "Mars", "Jupiter"], correctAnswer: "Mercury"),
     // Add more questions here...
