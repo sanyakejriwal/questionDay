@@ -31,18 +31,19 @@ struct ContentView: View {
             Spacer()
             
             Button("Generate Question") {
-                if waitingForQuestion {
-                    // The user needs to wait, show the alert.
-                    waitingForQuestion = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        waitingForQuestion = false
-                    }
-                } else {
-                    // Generate a new question if not waiting.
-                    currentQuestion = generateRandomQuestionIfNeeded()
-                }
-            }
-            .disabled(waitingForQuestion)
+                       if waitingForQuestion {
+                           // The user needs to wait, show the alert.
+                           waitingForQuestion = true
+                           DispatchQueue.main.async {
+                               waitingForQuestion = false
+                           }
+                       } else {
+                           // Generate a new question if not waiting.
+                           currentQuestion = generateRandomQuestionIfNeeded()
+                           waitingForQuestion = true // Set waitingForQuestion to true to trigger the alert.
+                       }
+                   }
+                   .disabled(waitingForQuestion)
         }
         .padding()
         .alert(isPresented: $waitingForQuestion) {
@@ -58,7 +59,7 @@ struct ContentView: View {
     }
     //make sure this is in the content view
     
-    func generateRandomQuestionIfNeeded() -> Question {
+    func generateRandomQuestionIfNeeded() -> Question? {
         if shouldDisplayNewQuestion() {
             guard !questionBank.isEmpty else {
                 fatalError("Question bank is empty. Add questions to the questionBank array.")
@@ -72,11 +73,7 @@ struct ContentView: View {
             
             return newQuestion
         } else {
-            return currentQuestion ?? Question(
-                text: "Please wait for a new question.",
-                choices: [],
-                correctAnswer: ""
-            )
+            return nil // Return nil when there's no need to display a new question.
         }
     }
     
